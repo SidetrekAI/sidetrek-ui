@@ -5,7 +5,8 @@ import { handleDAGChange, handleModelChange } from './utils'
 import YAML from 'yaml'
 import { CWD, SIDETREK_CONFIG_FILENAME } from './constants'
 
-console.log('cwd: ', CWD)
+// DEPLOY NOTES!!!
+// Make sure to include dbt, LibYAML, python, and bun in the Dockerfile
 
 const sidetrekConfigExists = await Bun.file(path.resolve(CWD, SIDETREK_CONFIG_FILENAME)).exists()
 if (!sidetrekConfigExists) {
@@ -14,34 +15,33 @@ if (!sidetrekConfigExists) {
 
 const sidetrekConfig = YAML.parse(await Bun.file(path.resolve(CWD, SIDETREK_CONFIG_FILENAME)).text())
 const projectName = sidetrekConfig.metadata.project_name
-console.log('projectName: ', projectName)
 
 const dbtProjectDir = path.resolve(CWD, `${projectName}/dbt/${projectName}`)
 const dbtModelsDir = path.resolve(dbtProjectDir, `models`)
 
-// DEPLOY NOTES!!!
-// Make sure to include dbt, LibYAML, python, and bun in the Dockerfile
+const runServer = async () => {
+  // Run `dbt run` on server start (which parses the dbt project and runs all the models)
+  try {
+    await $`poetry run dbt run`.cwd(dbtProjectDir)
+    console.log('dbt run completed on server start')
+  } catch (error) {
+    console.error(error)
+  }
 
-export default async function runServer() {
   const server = Bun.serve({
     port: 4040,
     async fetch(req, server) {
       // upgrade the request to a WebSocket
       if (server.upgrade(req)) {
-        // Run `dbt run` on server start (which parses the dbt project and runs all the models)
-        try {
-          await $`dbt run --fail-fast`.cwd(dbtProjectDir)
-          console.log('dbt run complete')
-        } catch (error) {
-          console.error(error)
-        }
-
         return // do not return a Response
       }
       return new Response('Upgrade failed', { status: 500 })
     },
     websocket: {
-      async open(ws) {}, // a socket is opened
+      async open(ws) {
+        // Send an initial message to render the DAG
+        handleDAGChange({ ws, dbtProjectDir })
+      }, // a socket is opened
       message(ws, message) {
         const watcher = watch(dbtModelsDir, { recursive: true }, async (event, filename) => {
           console.log(`Detected ${event} in ${filename}`)
@@ -70,3 +70,5 @@ export default async function runServer() {
 
   console.log(`Listening on ${server.hostname}:${server.port}`)
 }
+
+runServer()

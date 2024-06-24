@@ -9,9 +9,10 @@ export default function Dag() {
   const [edges, setEdges] = useState<Edge[]>([])
 
   const onMessage = useCallback((message: any) => {
-    if (message?.topic !== 'dag' || !message?.data) return
+    const messageJson = JSON.parse(message.data)
+    if (messageJson?.topic !== 'dag' || !messageJson?.data) return
 
-    const data = JSON.parse(message.data)
+    const data = messageJson.data
     console.log('data', data)
 
     setNodes(data?.nodes)
@@ -27,7 +28,7 @@ export default function Dag() {
   }, [socket, onMessage])
 
   return (
-    <div className="w-full h-full">
+    <div className="w-[400px] h-[300px]">
       <ReactFlow nodes={nodes} edges={edges} />
     </div>
   )

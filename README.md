@@ -1,7 +1,16 @@
 # Sidetrek UI
 
-## Run frontend UI
-In /ui, run `bun run dev`
+## Dev
 
-## Run the server
-In /server, run `bun run dev`
+### Make sure sidetrek-cli dev is running
+
+First make sure sidetrek-cli dev is running. In ../sidetrek-cli, `bun run dev`
+
+### Setup a test Sidetrek project (first time only)
+
+- `../sidetrek-cli/build/sidetrek init`
+- Make sure the project name is `test_proj`
+
+### Run the test Sidetrek project (which will run ui + server)
+
+- In project root, run `bun run dev`

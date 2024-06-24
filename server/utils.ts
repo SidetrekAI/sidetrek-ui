@@ -12,7 +12,7 @@ interface HandleDAGChangeArgs {
 export const handleDAGChange = async ({ ws, dbtProjectDir }: HandleDAGChangeArgs) => {
   // Run dbt parse for DAG
   try {
-    await $`dbt parse`.cwd(dbtProjectDir)
+    await $`poetry run dbt parse`.cwd(dbtProjectDir)
   } catch (error) {
     console.error(error)
   }
@@ -48,11 +48,13 @@ export const convertDbtManifestToRF = (dbtManifestJson: any): RFDag => {
 
   const rfNodes = R.compose(
     R.map((node: any) => {
+      const id = `${node.database}.${node.schema}.${node.name}`
       return {
-        id: node.unique_id,
+        id,
         data: {
           label: node.name,
           dbt: {
+            id,
             uniqueId: node.unique_id,
             resourceType: node.resource_type,
             createdAt: node.created_at,
@@ -67,9 +69,11 @@ export const convertDbtManifestToRF = (dbtManifestJson: any): RFDag => {
       }
     }),
     R.filter((node: any) => node.resource_type === 'model' || node.resource_type === 'source')
-  )([...dbtManifestJson.nodes, ...dbtManifestJson.sources])
+  )([...R.values(dbtManifestJson.nodes), ...R.values(dbtManifestJson.sources)])
+  console.log('rfNodes', rfNodes)
 
   const rfEdges = R.compose(
+    R.unnest,
     R.map((rfNode: RFNode) => {
       const dependsOn = rfNode.data?.dbt?.dependsOn?.nodes || []
 
@@ -84,6 +88,7 @@ export const convertDbtManifestToRF = (dbtManifestJson: any): RFDag => {
       return edges
     })
   )(rfNodes)
+  console.log('rfEdges', rfEdges)
 
   return {
     nodes: rfNodes,
@@ -101,7 +106,7 @@ export const handleModelChange = async ({ ws, dbtProjectDir, filepath }: HandleM
   const modelName = filepath.includes('/')
     ? filepath.split('/').at(-1)?.split('.sql').at(0)
     : filepath.split('.sql').at(0)
-  
+
   // // Run dbt compile for this model
   // try {
   //   const dbtCompileOut = await $`dbt compile --select ${modelName}`.cwd(dbtProjectDir).text()
